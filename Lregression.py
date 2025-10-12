@@ -205,3 +205,28 @@ for epoch in range(500):
     loss_curve_eval.append(loss.item())
 
 plot_loss(loss_curve_train, loss_curve_eval)
+
+x = torch.linspace(X_train[""].min(), X_train[""].max(), len(X_train[""]))
+
+model.eval()
+with torch.no_grad():
+    y = model((x.view(-1, 1) - mean_feature) / std_feature)
+    
+def plot_predictions(x, y):
+    plt.figure(figsize=(15, 5))
+    plt.scatter(
+        (X_train["feature_scaled"] * std_feature) + mean_feature,
+        y_train,
+        label="Data",
+        color="green",
+        alpha=0.5,
+    )
+    plt.plot(x, y, color="k", label="Predictions")
+    plt.xlabel("")
+    plt.ylabel("")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+    return
+
+plot_predictions(x, y)

@@ -1,0 +1,135 @@
+import tensorflow as tf
+import numpy as np
+
+# Enable eager execution (default in TF 2.x but good to be explicit)
+tf.config.run_functions_eagerly(True)
+
+# Helper function to simulate get_minibatch() (since it wasn't defined in original)
+def get_minibatch():
+    return np.random.random((100, 784)).astype(np.float32)
+
+# The TensorFlow interacts with a computation graph using eager execution in TF 2.x
+# Variables are created and can be used directly without sessions
+weights = tf.Variable(tf.random.normal([300,200], stddev=0.5), name="weights")
+W = tf.Variable(tf.random.uniform([784, 10], -1, 1), name="W")
+b = tf.Variable(tf.zeros([10]), name="biases")
+
+# Define a simple model function
+@tf.function
+def model(x):
+    return tf.matmul(x, W) + b
+
+# Test the model with sample data
+sample_data = get_minibatch()
+output = model(sample_data)
+
+# Parameters
+learning_rate = 0.01
+training_epochs = 1000  # Fixed variable name
+batch_size = 100
+display_step = 1  # Fixed variable name
+
+# In TF 2.x, we don't need placeholders - we pass data directly to functions
+# The None dimension is handled automatically in the function calls
+
+# Define functions that were referenced but not implemented in original
+def inference(x):
+    return tf.matmul(x, W) + b
+
+def loss(output, y):
+    return tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=output, labels=y))
+
+def evaluate(output, y):
+    correct_prediction = tf.equal(tf.argmax(output, 1), tf.argmax(y, 1))
+    return tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+
+# Define optimizer
+optimizer = tf.optimizers.SGD(learning_rate=learning_rate)
+
+# Global step counter
+global_step = tf.Variable(0, name='global_step', trainable=False)
+
+# Training function
+@tf.function
+def training_step(x_batch, y_batch):
+    with tf.GradientTape() as tape:
+        output = inference(x_batch)
+        cost = loss(output, y_batch)
+    
+    gradients = tape.gradient(cost, [W, b])
+    optimizer.apply_gradients(zip(gradients, [W, b]))
+    global_step.assign_add(1)
+    return cost
+
+# Setup summary writer
+summary_writer = tf.summary.create_file_writer("logistic_logs/")
+
+# Initialize checkpoint manager
+checkpoint = tf.train.Checkpoint(optimizer=optimizer, W=W, b=b, global_step=global_step)
+checkpoint_manager = tf.train.CheckpointManager(checkpoint, "logistic_logs/", max_to_keep=3)
+
+# Simulate MNIST data (since mnist object wasn't defined in original)
+class MockMNIST:
+    def __init__(self):
+        # Generate mock data
+        self.train_images = np.random.random((55000, 784)).astype(np.float32)
+        self.train_labels = np.eye(10)[np.random.randint(0, 10, 55000)].astype(np.float32)
+        self.validation_images = np.random.random((5000, 784)).astype(np.float32)
+        self.validation_labels = np.eye(10)[np.random.randint(0, 10, 5000)].astype(np.float32)
+        self.test_images = np.random.random((10000, 784)).astype(np.float32)
+        self.test_labels = np.eye(10)[np.random.randint(0, 10, 10000)].astype(np.float32)
+        self.num_examples = 55000
+        self.current_index = 0
+    
+    def next_batch(self, batch_size):
+        start = self.current_index
+        end = start + batch_size
+        if end > self.num_examples:
+            # Reset to beginning
+            self.current_index = 0
+            start = 0
+            end = batch_size
+        else:
+            self.current_index = end
+        
+        return self.train_images[start:end], self.train_labels[start:end]
+
+# Create mock MNIST data
+mnist = MockMNIST()
+
+# Training Cycle
+for epoch in range(training_epochs):
+    avg_cost = 0.
+    total_batch = int(mnist.num_examples/batch_size)
+    
+    # Loop over all batches
+    for i in range(total_batch):
+        mbatch_x, mbatch_y = mnist.next_batch(batch_size)  # Fixed variable name
+        
+        # Fit training using batch data
+        minibatch_cost = training_step(mbatch_x, mbatch_y)
+        avg_cost += minibatch_cost/total_batch
+    
+    # Display logs per epoch step
+    if epoch % display_step == 0:  # Fixed comparison operator
+        # Validation
+        val_output = inference(mnist.validation_images)
+        accuracy = evaluate(val_output, mnist.validation_labels)
+        
+        print(f"Epoch {epoch}, Validation Error: {1 - accuracy.numpy()}")  # Fixed print syntax
+        
+        # Write summary
+        with summary_writer.as_default():
+            tf.summary.scalar('accuracy', accuracy, step=global_step)
+            tf.summary.scalar('loss', avg_cost, step=global_step)
+        
+        # Save checkpoint
+        checkpoint_manager.save()
+
+print("Optimization Finished!")
+
+# Test evaluation
+test_output = inference(mnist.test_images)
+test_accuracy = evaluate(test_output, mnist.test_labels)
+print(f"Test accuracy: {test_accuracy.numpy()}")  # Fixed print syntax
+

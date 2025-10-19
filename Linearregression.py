@@ -1,3 +1,5 @@
+# Content from OpenCV University bootcamp
+
 import os
 import numpy as np
 import random
